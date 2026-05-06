@@ -12,7 +12,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from urllib.parse import parse_qs, quote, urlparse
 
-from flask import Flask, jsonify, request, send_from_directory, url_for
+from flask import Flask, jsonify, request, send_from_directory
 from pytubefix import YouTube
 
 app = Flask(__name__)
@@ -59,6 +59,21 @@ def after_request(response):
 
 def _json_error(message, status_code=400):
     return jsonify({"error": message}), status_code
+
+
+def _user_facing_error(exc: Exception) -> str:
+    message = str(exc)
+    if "detected as a bot" in message.lower():
+        if _proxy_settings():
+            return (
+                "YouTube still detected this hosted backend as bot traffic even with the configured proxy. "
+                "Try a different residential/mobile proxy or run the backend locally."
+            )
+        return (
+            "YouTube detected this hosted backend as bot traffic. Render's shared IP needs a proxy to work reliably. "
+            "Set YT_DOWNLOADER_PROXY on the Render service and redeploy."
+        )
+    return message
 
 
 def _utc_now() -> str:
@@ -196,7 +211,8 @@ def _start_download_job(job_id: str, url: str, requested_resolution: str | None)
         payload = _prepare_download(job_id, yt, url, requested_resolution)
         _update_job(job_id, status="complete", phase="complete", message="Download complete", progress=100, result=payload)
     except Exception as exc:
-        _update_job(job_id, status="error", phase="error", message=str(exc), error=str(exc))
+        message = _user_facing_error(exc)
+        _update_job(job_id, status="error", phase="error", message=message, error=message)
 
 
 def _sanitize_filename(value: str, fallback: str = "download") -> str:
@@ -618,7 +634,7 @@ def _handle_video_info(url: str):
         video_id = _extract_video_id(url)
         return jsonify(_get_video_metadata(yt, video_id)), 200
     except Exception as exc:
-        return _json_error(str(exc), 500)
+        return _json_error(_user_facing_error(exc), 500)
 
 
 def _handle_available_resolutions(url: str):
@@ -653,7 +669,7 @@ def _handle_available_resolutions(url: str):
             200,
         )
     except Exception as exc:
-        return _json_error(str(exc), 500)
+        return _json_error(_user_facing_error(exc), 500)
 
 
 def _handle_download(url: str, resolution: str | None):
@@ -683,7 +699,16 @@ def _handle_download(url: str, resolution: str | None):
 
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok"}), 200
+    return (
+        jsonify(
+            {
+                "status": "ok",
+                "youtube_client": YOUTUBE_CLIENT,
+                "proxy_configured": _proxy_settings() is not None,
+            }
+        ),
+        200,
+    )
 
 
 @app.route("/api/video-info", methods=["POST", "OPTIONS"])

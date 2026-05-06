@@ -76,6 +76,20 @@ Render will build the `Dockerfile`, install `ffmpeg`, and start the app with Gun
 
 After deploy, the extension will use the Render service URL by default.
 
+For Render to work reliably with YouTube, configure a proxy because YouTube may block Render's shared IPs:
+
+```text
+YT_DOWNLOADER_PROXY=http://username:password@proxy-host:proxy-port
+```
+
+SOCKS proxies are also supported if your proxy provider gives you one:
+
+```text
+YT_DOWNLOADER_PROXY=socks5://username:password@proxy-host:proxy-port
+```
+
+After setting the environment variable in Render, redeploy the service and check `/health`. It should return `"proxy_configured": true`.
+
 ## Notes
 
 - The backend accepts common YouTube URL forms such as `youtube.com/watch`, `youtu.be`, `shorts`, and `embed`.
