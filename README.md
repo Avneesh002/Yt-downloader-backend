@@ -72,7 +72,7 @@ This backend is ready for a Render free web service.
 
 Render will build the `Dockerfile`, install `ffmpeg`, and start the app with Gunicorn on the Render port.
 
-After deploy, copy the service URL and paste it into the extension's backend URL field.
+After deploy, the extension will use the Render service URL by default.
 
 ## Notes
 

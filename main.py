@@ -34,6 +34,8 @@ JOB_PHASE_BOUNDS = {
     "error": (0, 0),
 }
 
+YOUTUBE_CLIENT = "WEB"
+
 
 def _add_cors_headers(response):
     response.headers["Access-Control-Allow-Origin"] = "*"
@@ -137,10 +139,25 @@ def _progress_callback_factory(job_id: str):
     return callback
 
 
+def _make_youtube(url: str, *, on_progress_callback=None):
+    """
+    Prefer the WEB client so Pytubefix can generate a PO token automatically.
+
+    If the installed version has an unexpected signature, fall back to the
+    library's default client path rather than failing immediately.
+    """
+    try:
+        return YouTube(url, YOUTUBE_CLIENT, on_progress_callback=on_progress_callback)
+    except TypeError:
+        if on_progress_callback is None:
+            return YouTube(url)
+        return YouTube(url, on_progress_callback=on_progress_callback)
+
+
 def _start_download_job(job_id: str, url: str, requested_resolution: str | None) -> None:
     try:
         _set_job_phase(job_id, "resolving", "Resolving available streams...", 1)
-        yt = YouTube(url, on_progress_callback=_progress_callback_factory(job_id))
+        yt = _make_youtube(url, on_progress_callback=_progress_callback_factory(job_id))
         payload = _prepare_download(job_id, yt, url, requested_resolution)
         _update_job(job_id, status="complete", phase="complete", message="Download complete", progress=100, result=payload)
     except Exception as exc:
@@ -562,7 +579,7 @@ def _handle_video_info(url: str):
         return _json_error("Invalid YouTube URL.", 400)
 
     try:
-        yt = YouTube(url)
+        yt = _make_youtube(url)
         video_id = _extract_video_id(url)
         return jsonify(_get_video_metadata(yt, video_id)), 200
     except Exception as exc:
@@ -577,7 +594,7 @@ def _handle_available_resolutions(url: str):
         return _json_error("Invalid YouTube URL.", 400)
 
     try:
-        yt = YouTube(url)
+        yt = _make_youtube(url)
         video_id = _extract_video_id(url)
         streams = _list_streams(yt)
         available_resolutions = [stream["resolution"] for stream in streams]
