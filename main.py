@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import os
 import shutil
 import subprocess
 import tempfile
@@ -35,6 +36,13 @@ JOB_PHASE_BOUNDS = {
 }
 
 YOUTUBE_CLIENT = "WEB"
+PROXY_ENV_VARS = (
+    "YT_DOWNLOADER_PROXY",
+    "HTTPS_PROXY",
+    "HTTP_PROXY",
+    "https_proxy",
+    "http_proxy",
+)
 
 
 def _add_cors_headers(response):
@@ -139,6 +147,34 @@ def _progress_callback_factory(job_id: str):
     return callback
 
 
+def _proxy_settings() -> dict[str, str] | None:
+    proxy_url = None
+    for env_var in PROXY_ENV_VARS:
+        value = os.environ.get(env_var)
+        if value:
+            proxy_url = value.strip()
+            break
+
+    if not proxy_url:
+        return None
+
+    return {
+        "http": proxy_url,
+        "https": proxy_url,
+    }
+
+
+def _youtube_kwargs(on_progress_callback=None) -> dict:
+    kwargs = {}
+    proxies = _proxy_settings()
+    if on_progress_callback is not None:
+        kwargs["on_progress_callback"] = on_progress_callback
+    if proxies:
+        kwargs["proxies"] = proxies
+        app.logger.info("Using proxy settings from environment for YouTube requests.")
+    return kwargs
+
+
 def _make_youtube(url: str, *, on_progress_callback=None):
     """
     Prefer the WEB client so Pytubefix can generate a PO token automatically.
@@ -146,12 +182,11 @@ def _make_youtube(url: str, *, on_progress_callback=None):
     If the installed version has an unexpected signature, fall back to the
     library's default client path rather than failing immediately.
     """
+    kwargs = _youtube_kwargs(on_progress_callback)
     try:
-        return YouTube(url, YOUTUBE_CLIENT, on_progress_callback=on_progress_callback)
+        return YouTube(url, YOUTUBE_CLIENT, **kwargs)
     except TypeError:
-        if on_progress_callback is None:
-            return YouTube(url)
-        return YouTube(url, on_progress_callback=on_progress_callback)
+        return YouTube(url, **kwargs)
 
 
 def _start_download_job(job_id: str, url: str, requested_resolution: str | None) -> None:

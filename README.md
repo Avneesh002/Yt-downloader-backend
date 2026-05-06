@@ -16,6 +16,8 @@ Flask API for a Chrome extension that downloads YouTube videos in the best avail
 
 - Python 3.10+
 - `ffmpeg` available on your `PATH`
+- `nodejs-wheel-binaries` installed through `requirements.txt`
+- Optional: a proxy URL in `YT_DOWNLOADER_PROXY`, `HTTPS_PROXY`, or `HTTP_PROXY` if YouTube flags the backend IP
 
 ## Install
 
@@ -79,3 +81,4 @@ After deploy, the extension will use the Render service URL by default.
 - The backend accepts common YouTube URL forms such as `youtube.com/watch`, `youtu.be`, `shorts`, and `embed`.
 - Downloads are written to `backend/downloads/` and served back as attachments.
 - CORS is enabled for local extension usage.
+- If YouTube flags requests as bot traffic on your hosting IP, configure a proxy for the backend and redeploy.
