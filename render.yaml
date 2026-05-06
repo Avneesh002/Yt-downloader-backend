@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: yt-downloader-backend
+    runtime: docker
+    plan: free
+    autoDeployTrigger: commit
+    healthCheckPath: /health
+    maxShutdownDelaySeconds: 120
+    dockerfilePath: ./Dockerfile
+    dockerContext: .

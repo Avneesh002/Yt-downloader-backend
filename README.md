@@ -1,76 +1,81 @@
-# YouTube Video Downloader and Info API
+# YouTube Downloader Backend
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+Flask API for a Chrome extension that downloads YouTube videos in the best available resolution.
 
-## Description
-The YouTube Video Downloader and Info API is a Flask-based Python project that allows you to download YouTube videos and retrieve video information using Pytube. This versatile tool provides two main functionalities:
+## What it does
 
-1. **Download Video:** You can specify the video URL and resolution to download YouTube videos directly to your local machine.
+- Reads the current YouTube video URL from the extension
+- Lists the available resolutions and formats
+- Downloads the requested stream
+- Falls back to adaptive video + audio streams and merges them with `ffmpeg`
+- Supports non-MP4 streams such as WebM, with MKV fallback when needed
+- Serves the finished media file back to the extension for saving
+- Exposes job status so the extension can show progress while the download runs
 
-2. **Get Video Info:** You can retrieve detailed information about a YouTube video, including its title, author, length, views, description, and publish date.
+## Requirements
 
-This project is designed to simplify the process of interacting with YouTube content programmatically.
+- Python 3.10+
+- `ffmpeg` available on your `PATH`
 
-## Features
-- Download YouTube videos in various resolutions.
-- Retrieve comprehensive information about YouTube videos.
-- Error handling for reliable performance.
-- JSON API endpoints for easy integration into other applications.
+## Install
 
-## Libraries and Technologies Used
-- Python 3.x
-- Flask for building the API.
-- Pytube for interacting with YouTube content.
-- re for URL validation.
+```bash
+pip install -r requirements.txt
+```
 
-## Usage
-1. Clone this repository: `git clone https://github.com/zararashraf/youtube-video-downloader-api.git`
-2. Install the required libraries: `pip install flask pytubefix`
-3. Run the Flask application: `python main.py`
-4. Access the API endpoints using HTTP requests (e.g., POST requests in Postman).
+## Run
 
-## API Endpoints
+```bash
+python main.py
+```
 
-### Download Video by Resolution
-- **Endpoint:** `/download/<resolution>`
-- **HTTP Method:** POST
-- **Request Body:** JSON
-    ```json
-    {
-        "url": "https://www.youtube.com/watch?v=VIDEO_ID"
-    }
-    ```
+The API listens on `http://127.0.0.1:5000` by default.
 
-### Get Video Info
-- **Endpoint:** `/video_info`
-- **HTTP Method:** POST
-- **Request Body:** JSON
-    ```json
-    {
-        "url": "https://www.youtube.com/watch?v=VIDEO_ID"
-    }
-    ```
+## Endpoints
 
-### Get Available Resolutions
-- **Endpoint:** `/available_resolutions`
-- **HTTP Method:** POST
-- **Request Body:** JSON
-    ```json
-    {
-        "url": "https://www.youtube.com/watch?v=VIDEO_ID"
-    }
-    ```
+- `GET /health`
+- `POST /api/video-info`
+- `POST /api/available-resolutions`
+- `POST /api/download`
+- `GET /api/jobs/<job_id>`
 
-## Screenshots
-### Downloading a Video
-![image](https://github.com/zararashraf/youtube-video-downloader-api/assets/36181292/edad60c8-27fc-4ed0-8243-21ffc4cc16cc)
+Legacy aliases are also kept for compatibility:
 
-### Retrieving Info
-![image](https://github.com/zararashraf/youtube-video-downloader-api/assets/36181292/e0e3aeb3-fa97-41c7-9d89-971f2cda421e)
+- `POST /video_info`
+- `POST /available_resolutions`
+- `POST /download/<resolution>`
 
+## Request body
 
-## Code Repository
-You can access the source code for this project on [GitHub](https://github.com/zararashraf/youtube-video-downloader-api/blob/main/main.py).
+```json
+{
+  "url": "https://www.youtube.com/watch?v=VIDEO_ID",
+  "resolution": "720p"
+}
+```
 
-## License
-This project is licensed under the [MIT License](https://opensource.org/licenses/MIT). You are free to use, modify, and distribute the code while providing appropriate attribution.
+If `resolution` is omitted or set to `best`, the backend picks the highest available stream.
+
+For adaptive streams, the backend prefers MP4 when both tracks are MP4-compatible. Otherwise it falls back to MKV so that higher-resolution WebM streams can still be merged and downloaded cleanly.
+
+`POST /api/download` starts a background job and returns a `job_id`. The extension polls `GET /api/jobs/<job_id>` until the job becomes `complete`, then it downloads the final file from the returned `download_url`.
+
+## Deploy to Render
+
+This backend is ready for a Render free web service.
+
+1. Push the `backend/` repo to GitHub.
+2. In Render, create a new `Web Service`.
+3. Choose the Docker-based service type.
+4. Use the provided `render.yaml` or point Render at this folder.
+5. Keep the instance on the `Free` plan.
+
+Render will build the `Dockerfile`, install `ffmpeg`, and start the app with Gunicorn on the Render port.
+
+After deploy, copy the service URL and paste it into the extension's backend URL field.
+
+## Notes
+
+- The backend accepts common YouTube URL forms such as `youtube.com/watch`, `youtu.be`, `shorts`, and `embed`.
+- Downloads are written to `backend/downloads/` and served back as attachments.
+- CORS is enabled for local extension usage.
